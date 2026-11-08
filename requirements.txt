@@ -1,0 +1,8 @@
+streamlit>=1.40,<2
+av>=12,<17
+numpy>=1.26,<3
+Pillow>=10.4,<13
+pyserial>=3.5,<4
+yt-dlp[default]>=2026.3.17
+deno>=2.4.5,<3
+requests>=2.32,<3

@@ -1,0 +1,22 @@
+[Unit]
+Description=LED matrix controller for %i
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=%i
+SupplementaryGroups=dialout
+WorkingDirectory=/home/%i/led-matrix
+EnvironmentFile=-/home/%i/led-matrix/deploy/matrix.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/%i/led-matrix/.venv/bin/python -m matrix_app --server.address=0.0.0.0 --server.port=8501 --server.headless=true --server.fileWatcherType=none
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillMode=control-group
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

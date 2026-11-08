@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body { margin: 0; font: 14px sans-serif; color: #888; }
+  canvas { width: min(100%, 484px); height: auto; display: block; touch-action: none;
+           cursor: crosshair; image-rendering: pixelated; border: 1px solid #555; }
+</style></head>
+<body><canvas id="canvas" width="484" height="484" aria-label="22 by 22 pixel drawing canvas"></canvas>
+<script>
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+let pixels = Array(484).fill('#000000'), revision = -1, color = '#ff4000';
+let drawing = false, previous = null, lastSent = 0;
+function send(type, data = {}) {
+  window.parent.postMessage({isStreamlitMessage: true, type, ...data}, '*');
+}
+function render() {
+  for (let y = 0; y < 22; y++) for (let x = 0; x < 22; x++) {
+    ctx.fillStyle = pixels[y * 22 + x]; ctx.fillRect(x * 22, y * 22, 22, 22);
+    ctx.strokeStyle = '#444'; ctx.strokeRect(x * 22 + .5, y * 22 + .5, 21, 21);
+  }
+}
+function publish() {
+  lastSent = performance.now();
+  send('streamlit:setComponentValue', {value: {pixels: pixels.slice(), revision}, dataType: 'json'});
+}
+function paint(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(21, Math.floor((event.clientX - rect.left) * 22 / rect.width)));
+  const y = Math.max(0, Math.min(21, Math.floor((event.clientY - rect.top) * 22 / rect.height)));
+  // Interpolate so quick drags do not leave holes.
+  const from = previous || [x, y], dx = x - from[0], dy = y - from[1];
+  const steps = Math.max(1, Math.abs(dx), Math.abs(dy));
+  for (let i = 0; i <= steps; i++) {
+    const px = Math.round(from[0] + dx * i / steps), py = Math.round(from[1] + dy * i / steps);
+    pixels[py * 22 + px] = color;
+  }
+  previous = [x, y]; render();
+  if (performance.now() - lastSent > 120) publish();
+}
+canvas.addEventListener('pointerdown', e => {
+  drawing = true; previous = null; canvas.setPointerCapture(e.pointerId); paint(e);
+});
+canvas.addEventListener('pointermove', e => { if (drawing) paint(e); });
+function finish() { if (drawing) { drawing = false; previous = null; publish(); } }
+canvas.addEventListener('pointerup', finish);
+canvas.addEventListener('pointercancel', finish);
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || event.data.type !== 'streamlit:render') return;
+  const args = event.data.args;
+  color = args.color;
+  if (revision !== args.revision) {
+    revision = args.revision; pixels = args.pixels.slice(); render();
+  }
+  send('streamlit:setFrameHeight', {height: canvas.getBoundingClientRect().height + 4});
+});
+window.addEventListener('resize', () => send('streamlit:setFrameHeight', {height: canvas.getBoundingClientRect().height + 4}));
+send('streamlit:componentReady', {apiVersion: 1});
+render();
+</script></body></html>
